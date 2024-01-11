@@ -116,7 +116,7 @@ def _get_ripplefilter_kernel(sampling_frequency):
     # Filter specifications
     low_cutoff = 150  # Hz
     high_cutoff = 250  # Hz
-    roll_off_db = 40  # dB
+    roll_off_db = 40  # dB ### roll off db per decade
     sidebands_hz = 10  # Hz
 
     # Calculate filter parameters
@@ -125,7 +125,7 @@ def _get_ripplefilter_kernel(sampling_frequency):
     high = (high_cutoff + sidebands_hz) / nyquist
 
     # Design bandpass filter
-    sos = butter(N=4, Wn=[low, high], btype='band', output='sos')
+    sos = butter(N= roll_off_db/10, Wn=[low, high], btype='band', output='sos')
     
     # # Frequency response of the filter
     # frequencies, response = sosfreqz(sos, worN=8000, fs=sampling_frequency)
