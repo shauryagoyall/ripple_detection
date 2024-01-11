@@ -8,8 +8,7 @@ import pandas as pd
 from scipy.fftpack import next_fast_len
 from scipy.io import loadmat
 from scipy.ndimage import gaussian_filter1d
-from scipy.signal import filtfilt, hilbert, remez
-
+from scipy.signal import filtfilt, hilbert, remez, butter, sosfreqz, sos2tf
 
 def ripple_bandpass_filter(sampling_frequency):
     ORDER = 101
@@ -79,7 +78,7 @@ def segment_boolean_series(series, minimum_duration=0.015):
     ]
 
 
-def filter_ripple_band(data):
+def filter_ripple_band(data, sampling_frequency = 1500):
     """Returns a bandpass filtered signal between 150-250 Hz
 
     Parameters
@@ -91,7 +90,7 @@ def filter_ripple_band(data):
     filtered_data : array_like, shape (n_time,)
 
     """
-    filter_numerator, filter_denominator = _get_ripplefilter_kernel()
+    filter_numerator, filter_denominator = _get_ripplefilter_kernel(sampling_frequency)
     is_nan = np.any(np.isnan(data), axis=-1)
     filtered_data = np.full_like(data, np.nan)
     filtered_data[~is_nan] = filtfilt(
@@ -100,14 +99,50 @@ def filter_ripple_band(data):
     return filtered_data
 
 
-def _get_ripplefilter_kernel():
-    """Returns the pre-computed ripple filter kernel from the Frank lab.
+# def _get_ripplefilter_kernel():
+#     """Returns the pre-computed ripple filter kernel from the Frank lab.
+#     The kernel is 150-250 Hz bandpass with 40 db roll off and 10 Hz
+#     sidebands. Sampling frequency is 1500 Hz.
+#     """
+#     filter_file = join(abspath(dirname(__file__)), "ripplefilter.mat")
+#     ripplefilter = loadmat(filter_file)
+#     return ripplefilter["ripplefilter"]["kernel"][0][0].flatten(), 1
+
+def _get_ripplefilter_kernel(sampling_frequency):
+    """Returns a dynamically computed ripple filter kernel.
     The kernel is 150-250 Hz bandpass with 40 db roll off and 10 Hz
-    sidebands. Sampling frequency is 1500 Hz.
+    sidebands. The sampling frequency is specified.
     """
-    filter_file = join(abspath(dirname(__file__)), "ripplefilter.mat")
-    ripplefilter = loadmat(filter_file)
-    return ripplefilter["ripplefilter"]["kernel"][0][0].flatten(), 1
+    # Filter specifications
+    low_cutoff = 150  # Hz
+    high_cutoff = 250  # Hz
+    roll_off_db = 40  # dB
+    sidebands_hz = 10  # Hz
+
+    # Calculate filter parameters
+    nyquist = 0.5 * sampling_frequency
+    low = (low_cutoff - sidebands_hz) / nyquist
+    high = (high_cutoff + sidebands_hz) / nyquist
+
+    # Design bandpass filter
+    sos = butter(N=4, Wn=[low, high], btype='band', output='sos')
+    
+    # # Frequency response of the filter
+    # frequencies, response = sosfreqz(sos, worN=8000, fs=sampling_frequency)
+
+    # # Optionally, you can plot the frequency response
+    # plt.plot(frequencies, 20 * np.log10(np.abs(response)))
+    # plt.title('Filter Frequency Response')
+    # plt.xlabel('Frequency (Hz)')
+    # plt.axvline(x=150)
+    # plt.axvline(x=250)
+    # plt.ylabel('Gain (dB)')
+    # plt.show()
+
+    # Convert the second-order sections to a filter kernel
+    filter_kernel = sos2tf(sos)[1]
+
+    return filter_kernel, 1
 
 
 def extend_threshold_to_mean(
@@ -143,7 +178,7 @@ def extend_threshold_to_mean(
     return sorted(_extend_segment(above_threshold_segments, above_mean_segments))
 
 
-def exclude_movement(candidate_ripple_times, speed, time, speed_threshold=4.0):
+def exclude_movement(candidate_ripple_times, speed, time, speed_threshold=5.0):
     """Removes candidate ripples if the animal is moving.
 
     Parameters
