@@ -78,7 +78,7 @@ def segment_boolean_series(series, minimum_duration=0.015):
     ]
 
 
-def filter_ripple_band(data, sampling_frequency = 1500):
+def filter_ripple_band(data, sampling_frequency = 1250):
     """Returns a bandpass filtered signal between 150-250 Hz
 
     Parameters
